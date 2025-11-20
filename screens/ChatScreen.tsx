@@ -100,24 +100,6 @@ export default function ChatScreen() {
     );
   };
 
-  const handlePlusPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      "Additional Options",
-      "Choose an option:",
-      [
-        {
-          text: "Voice Input",
-          onPress: handleVoiceInput,
-        },
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-      ]
-    );
-  };
-
   const toggleVoiceResponse = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setVoiceEnabled(!voiceEnabled);
@@ -212,7 +194,6 @@ export default function ChatScreen() {
           <View style={{ flex: 1 }}>
             <ChatInput 
               onSend={handleSend} 
-              onPlusPress={handlePlusPress}
               disabled={loading || isSpeaking} 
             />
           </View>

@@ -7,10 +7,11 @@ import { Spacing, Shadows, BorderRadius } from "@/constants/theme";
 
 interface FABProps {
   onPress: () => void;
+  icon?: keyof typeof Feather.glyphMap;
   inputContainerHeight?: number;
 }
 
-export function FAB({ onPress, inputContainerHeight = 100 }: FABProps) {
+export function FAB({ onPress, icon = "mic", inputContainerHeight = 100 }: FABProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
@@ -30,7 +31,7 @@ export function FAB({ onPress, inputContainerHeight = 100 }: FABProps) {
       ]}
       onPress={onPress}
     >
-      <Feather name="mic" size={24} color="#FFFFFF" />
+      <Feather name={icon} size={24} color="#FFFFFF" />
     </Pressable>
   );
 }

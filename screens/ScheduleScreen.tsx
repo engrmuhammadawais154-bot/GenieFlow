@@ -129,7 +129,7 @@ export default function ScheduleScreen() {
     ]);
   };
 
-  const handleVoiceInput = () => {
+  const handleAddEventPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setModalVisible(true);
   };
@@ -243,7 +243,7 @@ export default function ScheduleScreen() {
         }
       />
 
-      <FAB onPress={handleVoiceInput} />
+      <FAB icon="plus" onPress={handleAddEventPress} />
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <ThemedView style={styles.modal}>
