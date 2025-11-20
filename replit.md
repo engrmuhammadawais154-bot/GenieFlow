@@ -7,6 +7,11 @@ This is a cross-platform mobile AI assistant application built with React Native
 ## Recent Changes
 
 **November 20, 2025**
+- **Finances Tab Enhancements:**
+  - Added quick-access currency converter button (dollar-sign icon) in header
+  - Migrated to expo-file-system/legacy API to fix SDK 54 deprecation
+  - Added helpful error messages for Expo Go limitations
+  - Platform-specific date/time pickers for event editing (web vs mobile)
 - **Schedule Tab Enhancements:**
   - Added edit functionality - tap event cards to edit title, description, date, and time
   - Integrated native date/time pickers (@react-native-community/datetimepicker)
@@ -26,15 +31,15 @@ This is a cross-platform mobile AI assistant application built with React Native
   - Enforced financial context limiting across ALL chat interactions
   - Non-financial queries receive polite redirect to finance topics
   - Integrated Google Gemini AI (gemini-1.5-flash) and OpenAI (gpt-3.5-turbo)
-- **UI Improvements:**
-  - Moved plus icon from chat input to Schedule screen FAB
-  - Chat FAB shows microphone with helpful scheduling examples
-  - Repositioned microphone FAB to sit above chat input dynamically
-  - Updated chat empty state to emphasize financial assistant capabilities
 - **Bug Fixes:**
   - Fixed missing BorderRadius import in ChatScreen.tsx
   - Fixed Google Calendar ID persistence for chat-created events
+  - Fixed expo-file-system deprecation warnings
   - Updated Expo packages to recommended versions
+- **Known Limitations:**
+  - Document upload (bank statement OCR) requires custom development build
+  - Expo Go doesn't support expo-document-picker due to iOS iCloud entitlement requirements
+  - For production, build standalone app or use EAS Build
 - **Security Note**: AI API keys are called directly from client (keys in bundle). For production, move to backend server.
 
 ## User Preferences

@@ -95,16 +95,33 @@ export default function FinancesScreen() {
         );
       } catch (processingError) {
         console.error("OCR processing error:", processingError);
-        Alert.alert(
-          "Processing Failed",
-          "Failed to process the document. Please ensure it's a valid bank statement."
-        );
+        
+        if (processingError && typeof processingError === 'object' && 'code' in processingError && processingError.code === 'ERR_UNAVAILABLE') {
+          Alert.alert(
+            "Feature Not Available in Expo Go",
+            "Document upload requires a custom development build. This feature doesn't work in Expo Go due to iOS entitlement requirements.\n\nFor testing, you can manually add transactions or build a custom development build."
+          );
+        } else {
+          Alert.alert(
+            "Processing Failed",
+            "Failed to process the document. Please ensure it's a valid bank statement."
+          );
+        }
       } finally {
         setProcessingStatement(false);
       }
     } catch (error) {
       console.error("Document picker error:", error);
-      Alert.alert("Error", "Failed to upload document. Please try again.");
+      
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_UNAVAILABLE') {
+        Alert.alert(
+          "Feature Not Available in Expo Go",
+          "Document upload requires a custom development build. This feature doesn't work in Expo Go due to iOS entitlement requirements.\n\nFor now, you can use the currency converter and PDF export features."
+        );
+      } else {
+        Alert.alert("Error", "Failed to upload document. Please try again.");
+      }
+      
       setProcessingStatement(false);
     }
   };
@@ -186,6 +203,12 @@ export default function FinancesScreen() {
           <View style={styles.sectionHeader}>
             <ThemedText type="h2">Recent Transactions</ThemedText>
             <View style={styles.headerActions}>
+              <Pressable 
+                onPress={() => setCurrencyModalVisible(true)} 
+                style={{ marginRight: Spacing.md }}
+              >
+                <Feather name="dollar-sign" size={24} color={theme.accent} />
+              </Pressable>
               <Pressable onPress={handleExportPDF} style={{ marginRight: Spacing.md }}>
                 <Feather name="download" size={24} color={theme.accent} />
               </Pressable>
