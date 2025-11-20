@@ -7,11 +7,13 @@ This is a cross-platform mobile AI assistant application built with React Native
 ## Recent Changes
 
 **November 20, 2025**
-- Fixed AI chat service to provide contextual responses using pattern-matching intent detection (schedule, currency, expense, general conversation) instead of relying on external API authentication
-- Added plus icon button to chat input for additional options alongside send button
-- Repositioned microphone FAB to dynamically sit above chat input using measured container height instead of hard-coded offsets
+- Integrated Google Gemini AI (gemini-1.5-flash) to power chat with intelligent, conversational responses
+- Moved plus icon from chat input to Schedule screen FAB for adding new events
+- Chat FAB now shows microphone icon for voice input, Schedule FAB shows plus icon for adding events
+- Repositioned microphone FAB to dynamically sit above chat input using measured container height
 - Fixed missing BorderRadius import in ChatScreen.tsx
 - Updated Expo packages to recommended versions (expo@~54.0.25, expo-glass-effect@~0.1.7, expo-linking@~8.0.9, expo-splash-screen@~31.0.11)
+- **Security Note**: Gemini API is called directly from client (API key in bundle). For production, move to backend server.
 
 ## User Preferences
 

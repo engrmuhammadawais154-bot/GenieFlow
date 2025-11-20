@@ -4,80 +4,94 @@ export interface AIIntent {
   response: string;
 }
 
-function analyzeIntent(input: string): AIIntent {
+// SECURITY NOTE: This implementation calls Gemini API directly from the client.
+// For production use, move this to a backend server to protect the API key.
+// The API key in process.env will be bundled into the JavaScript, making it
+// accessible to anyone who inspects the app bundle or network traffic.
+async function callGeminiAPI(input: string): Promise<string> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY not configured");
+    }
+
+    const systemPrompt = `You are a helpful AI assistant integrated into a mobile app. The app has three main features:
+1. Schedule - for creating calendar events and reminders
+2. Finances - for tracking expenses, currency conversion, and financial analysis
+3. Chat - where you interact with users
+
+When users ask about scheduling, meetings, or events, encourage them to check the Schedule tab.
+When users ask about money, expenses, currency conversion, or finances, mention the Finances tab.
+Be concise, friendly, and helpful. Keep responses brief and conversational.`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `${systemPrompt}\n\nUser: ${input}`,
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 500,
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!aiResponse) {
+      throw new Error("No response from Gemini");
+    }
+
+    return aiResponse.trim();
+  } catch (error) {
+    console.error("Gemini API error:", error);
+    return "I'm having trouble connecting right now. Please try again in a moment.";
+  }
+}
+
+function detectIntent(input: string): AIIntent["type"] {
   const lowerInput = input.toLowerCase();
   
-  if (lowerInput.includes("schedule") || lowerInput.includes("meeting") || lowerInput.includes("event") || lowerInput.includes("remind")) {
-    const titleMatch = input.match(/(?:schedule|create|add|set up)\s+(?:a\s+)?(?:meeting|event|reminder)?\s*(?:for\s+)?["']?([^"']+?)["']?(?:\s+(?:on|at|for|tomorrow|today|next))/i);
-    const title = titleMatch ? titleMatch[1].trim() : input.replace(/schedule|meeting|event|create|add|set up|remind/gi, '').trim();
-    
-    return {
-      type: "schedule_meeting",
-      entities: {
-        title: title || "New Event",
-        dateTime: new Date(Date.now() + 86400000).toISOString(),
-      },
-      response: `I'll help you schedule "${title || "your event"}". Please check the Schedule tab to complete the details.`,
-    };
+  if (lowerInput.includes("schedule") || lowerInput.includes("meeting") || lowerInput.includes("event") || lowerInput.includes("remind") || lowerInput.includes("calendar")) {
+    return "schedule_meeting";
   }
   
   if (lowerInput.includes("convert") || lowerInput.includes("currency") || /\d+\s*(usd|eur|gbp|jpy|cad|aud)/i.test(input)) {
-    const amountMatch = input.match(/(\d+(?:\.\d+)?)/);
-    const fromMatch = input.match(/(?:from\s+)?(\w{3})(?:\s+to)/i) || input.match(/(\d+(?:\.\d+)?)\s*(\w{3})/i);
-    const toMatch = input.match(/to\s+(\w{3})/i);
-    
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : 100;
-    const fromCurrency = fromMatch ? fromMatch[fromMatch.length === 3 ? 2 : 1].toUpperCase() : "USD";
-    const toCurrency = toMatch ? toMatch[1].toUpperCase() : "EUR";
-    
-    return {
-      type: "convert_currency",
-      entities: {
-        amount,
-        fromCurrency,
-        toCurrency,
-      },
-      response: `Converting ${amount} ${fromCurrency} to ${toCurrency}. Check the Finances tab for the conversion.`,
-    };
+    return "convert_currency";
   }
   
-  if (lowerInput.includes("expense") || lowerInput.includes("spend") || lowerInput.includes("transaction") || lowerInput.includes("budget")) {
-    return {
-      type: "analyze_expense",
-      entities: {},
-      response: "I can help you analyze your expenses. Check the Finances tab to view your transactions and spending patterns.",
-    };
+  if (lowerInput.includes("expense") || lowerInput.includes("spend") || lowerInput.includes("transaction") || lowerInput.includes("budget") || lowerInput.includes("finance") || lowerInput.includes("money")) {
+    return "analyze_expense";
   }
   
-  const greetings = ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"];
-  if (greetings.some(g => lowerInput.includes(g))) {
-    return {
-      type: "general",
-      entities: {},
-      response: "Hello! I'm your AI assistant. I can help you:\n• Schedule meetings and events\n• Convert currencies\n• Analyze expenses and finances\n\nWhat would you like to do?",
-    };
-  }
-  
-  const questions = ["how are you", "what can you do", "help", "what do you do"];
-  if (questions.some(q => lowerInput.includes(q))) {
-    return {
-      type: "general",
-      entities: {},
-      response: "I'm here to assist you with:\n\n📅 Scheduling: Create calendar events and reminders\n💱 Currency: Convert between different currencies\n💰 Finances: Track and analyze your expenses\n\nJust tell me what you need!",
-    };
-  }
-  
-  return {
-    type: "general",
-    entities: {},
-    response: `I understand you said: "${input}"\n\nI can help you with:\n• Scheduling meetings (try: "schedule a meeting for tomorrow")\n• Converting currency (try: "convert 100 USD to EUR")\n• Analyzing finances (try: "show my expenses")\n\nWhat would you like me to do?`,
-  };
+  return "general";
 }
 
 export async function processUserInput(input: string): Promise<AIIntent> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(analyzeIntent(input));
-    }, 500);
-  });
+  const intentType = detectIntent(input);
+  const geminiResponse = await callGeminiAPI(input);
+
+  return {
+    type: intentType,
+    entities: {},
+    response: geminiResponse,
+  };
 }
