@@ -7,13 +7,17 @@ This is a cross-platform mobile AI assistant application built with React Native
 ## Recent Changes
 
 **November 20, 2025**
-- Integrated Google Gemini AI (gemini-1.5-flash) to power chat with intelligent, conversational responses
+- Implemented multi-provider AI system with automatic fallback: Gemini → OpenAI → Local Finance Fallback
+- Added retry logic with exponential backoff (3 attempts, 500ms-5s delay) for all AI providers
+- Enforced financial context limiting across ALL chat interactions - app now finance-focused only
+- Non-financial queries receive polite redirect to finance topics
+- Integrated Google Gemini AI (gemini-1.5-flash) and OpenAI (gpt-3.5-turbo) for intelligent responses
 - Moved plus icon from chat input to Schedule screen FAB for adding new events
-- Chat FAB now shows microphone icon for voice input, Schedule FAB shows plus icon for adding events
+- Chat FAB shows microphone icon for voice input, Schedule FAB shows plus icon for adding events
 - Repositioned microphone FAB to dynamically sit above chat input using measured container height
 - Fixed missing BorderRadius import in ChatScreen.tsx
 - Updated Expo packages to recommended versions (expo@~54.0.25, expo-glass-effect@~0.1.7, expo-linking@~8.0.9, expo-splash-screen@~31.0.11)
-- **Security Note**: Gemini API is called directly from client (API key in bundle). For production, move to backend server.
+- **Security Note**: AI API keys are called directly from client (keys in bundle). For production, move to backend server.
 
 ## User Preferences
 
