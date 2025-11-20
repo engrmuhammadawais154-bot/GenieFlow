@@ -11,7 +11,7 @@ import { storage } from "@/services/storage";
 import { processUserInput } from "@/services/aiService";
 import { VoiceService } from "@/services/voiceService";
 import { Message } from "@/types";
-import { Spacing } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useIsFocused } from "@react-navigation/native";

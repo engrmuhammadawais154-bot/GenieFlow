@@ -56,6 +56,7 @@ export const BorderRadius = {
   card: 12,
   md: 18,
   lg: 24,
+  "2xl": 28,
   chatBubble: 16,
   chatBubbleTail: 4,
   fab: 28,
