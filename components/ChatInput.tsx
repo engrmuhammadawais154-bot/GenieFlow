@@ -6,10 +6,11 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
+  onPlusPress?: () => void;
   disabled?: boolean;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onPlusPress, disabled }: ChatInputProps) {
   const { theme, isDark } = useTheme();
   const [text, setText] = useState("");
 
@@ -27,6 +28,20 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
         { backgroundColor: theme.surface, borderColor: theme.border },
       ]}
     >
+      <Pressable
+        style={({ pressed }) => [
+          styles.plusButton,
+          {
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            opacity: pressed ? 0.6 : 1,
+          },
+        ]}
+        onPress={onPlusPress}
+        disabled={disabled}
+      >
+        <Feather name="plus" size={24} color={theme.accent} />
+      </Pressable>
       <TextInput
         style={[
           styles.input,
@@ -67,6 +82,15 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     borderTopWidth: 1,
     alignItems: "flex-end",
+    gap: Spacing.sm,
+  },
+  plusButton: {
+    width: Spacing.inputHeight,
+    height: Spacing.inputHeight,
+    borderRadius: BorderRadius.button,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
   },
   input: {
     flex: 1,
@@ -75,7 +99,6 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.input,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    marginRight: Spacing.md,
   },
   sendButton: {
     width: Spacing.inputHeight,

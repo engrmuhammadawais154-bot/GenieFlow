@@ -7,12 +7,15 @@ import { Spacing, Shadows, BorderRadius } from "@/constants/theme";
 
 interface FABProps {
   onPress: () => void;
+  inputContainerHeight?: number;
 }
 
-export function FAB({ onPress }: FABProps) {
+export function FAB({ onPress, inputContainerHeight = 100 }: FABProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
+
+  const bottomOffset = inputContainerHeight + Spacing.md;
 
   return (
     <Pressable
@@ -20,7 +23,7 @@ export function FAB({ onPress }: FABProps) {
         styles.fab,
         {
           backgroundColor: theme.accent,
-          bottom: tabBarHeight + Spacing.xl,
+          bottom: bottomOffset,
           transform: [{ scale: pressed ? 0.95 : 1 }],
         },
         Shadows.fab,

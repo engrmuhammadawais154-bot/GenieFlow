@@ -28,6 +28,7 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [inputContainerHeight, setInputContainerHeight] = useState(100);
 
   useEffect(() => {
     loadMessages();
@@ -99,6 +100,24 @@ export default function ChatScreen() {
     );
   };
 
+  const handlePlusPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      "Additional Options",
+      "Choose an option:",
+      [
+        {
+          text: "Voice Input",
+          onPress: handleVoiceInput,
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ]
+    );
+  };
+
   const toggleVoiceResponse = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setVoiceEnabled(!voiceEnabled);
@@ -156,6 +175,7 @@ export default function ChatScreen() {
             backgroundColor: theme.background,
           },
         ]}
+        onLayout={(e) => setInputContainerHeight(e.nativeEvent.layout.height)}
       >
         {isSpeaking ? (
           <View style={[styles.voiceControls, { backgroundColor: theme.surface }]}>
@@ -190,11 +210,15 @@ export default function ChatScreen() {
             />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <ChatInput onSend={handleSend} disabled={loading || isSpeaking} />
+            <ChatInput 
+              onSend={handleSend} 
+              onPlusPress={handlePlusPress}
+              disabled={loading || isSpeaking} 
+            />
           </View>
         </View>
       </View>
-      <FAB onPress={handleVoiceInput} />
+      <FAB onPress={handleVoiceInput} inputContainerHeight={inputContainerHeight} />
     </ThemedView>
   );
 }
