@@ -1,11 +1,17 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 const getBackendURL = (): string => {
   if (__DEV__) {
-    const replitDomain = Constants.expoConfig?.hostUri?.split(':')[0];
-    if (replitDomain) {
-      return `https://${replitDomain}:3001`;
+    const domain = process.env.REPLIT_DEV_DOMAIN;
+    if (domain) {
+      return `https://${domain.split('.')[0]}-3001.${domain.split('.').slice(1).join('.')}`;
     }
+    
+    if (Platform.OS === 'web') {
+      return window.location.origin.replace(':8081', ':3001');
+    }
+    
     return 'http://localhost:3001';
   }
   
@@ -18,3 +24,5 @@ export const API_ENDPOINTS = {
   UPLOAD_STATEMENT: `${BACKEND_URL}/api/files/statement`,
   HEALTH: `${BACKEND_URL}/health`,
 };
+
+console.log('Backend URL configured:', BACKEND_URL);
