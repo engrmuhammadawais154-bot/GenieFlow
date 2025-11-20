@@ -121,30 +121,43 @@ export default function ScheduleScreen() {
   };
 
   const handleDeleteEvent = async (event: Event) => {
-    Alert.alert("Delete Event", `Are you sure you want to delete "${event.title}"?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            if (event.googleCalendarEventId) {
-              await deleteCalendarEvent(event.googleCalendarEventId);
-            }
+    const performDelete = async () => {
+      try {
+        if (event.googleCalendarEventId) {
+          await deleteCalendarEvent(event.googleCalendarEventId);
+        }
 
-            await cancelEventReminders(event.id);
+        await cancelEventReminders(event.id);
 
-            const updatedEvents = events.filter((e) => e.id !== event.id);
-            setEvents(updatedEvents);
-            await storage.saveEvents(updatedEvents);
+        const updatedEvents = events.filter((e) => e.id !== event.id);
+        setEvents(updatedEvents);
+        await storage.saveEvents(updatedEvents);
 
-            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          } catch (error) {
-            Alert.alert("Error", "Failed to delete event. Please try again.");
-          }
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (error) {
+        if (Platform.OS === 'web') {
+          window.alert("Failed to delete event. Please try again.");
+        } else {
+          Alert.alert("Error", "Failed to delete event. Please try again.");
+        }
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(`Are you sure you want to delete "${event.title}"?`);
+      if (confirmed) {
+        await performDelete();
+      }
+    } else {
+      Alert.alert("Delete Event", `Are you sure you want to delete "${event.title}"?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: performDelete,
         },
-      },
-    ]);
+      ]);
+    }
   };
 
   const handleEditEvent = (event: Event) => {
