@@ -1,4 +1,4 @@
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { Transaction } from "@/types";
 import { categorizeTransaction } from "./categorizationService";
 
