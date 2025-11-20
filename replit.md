@@ -7,11 +7,17 @@ This is a cross-platform mobile AI assistant application built with React Native
 ## Recent Changes
 
 **November 20, 2025**
+- **BREAKING: Backend Server Required:**
+  - Created Node.js/Express backend in `/server` folder
+  - AI chat now proxies through backend (Gemini → OpenAI → Local fallback)
+  - File uploads for bank statements processed server-side
+  - **CRITICAL**: API keys moved to server - mobile app no longer has direct API access
+  - Backend must be running for AI chat and file uploads to work
+  - See `/server/README.md` for setup instructions
 - **Finances Tab Enhancements:**
   - Added quick-access currency converter button (dollar-sign icon) in header
   - Migrated to expo-file-system/legacy API to fix SDK 54 deprecation
   - Added helpful error messages for Expo Go limitations
-  - Platform-specific date/time pickers for event editing (web vs mobile)
 - **Schedule Tab Enhancements:**
   - Added edit functionality - tap event cards to edit title, description, date, and time
   - Integrated native date/time pickers (@react-native-community/datetimepicker)
@@ -21,32 +27,69 @@ This is a cross-platform mobile AI assistant application built with React Native
 - **Natural Language Event Scheduling:**
   - Chat can now create events from natural language (e.g., "Schedule meeting tomorrow at 2pm")
   - Uses chrono-node library for intelligent date/time parsing
-  - Supports various formats: "Remind me to...", "Schedule...", "[Title] on [day] at [time]"
-  - Automatically detects scheduling intent from keywords and time indicators
   - Events created via chat sync to Schedule tab and Google Calendar
-  - Confirmation messages with formatted date/time
-- **Multi-Provider AI System:**
-  - Implemented automatic fallback: Gemini → OpenAI → Local Finance Fallback
-  - Added retry logic with exponential backoff (3 attempts, 500ms-5s delay)
-  - Enforced financial context limiting across ALL chat interactions
-  - Non-financial queries receive polite redirect to finance topics
-  - Integrated Google Gemini AI (gemini-1.5-flash) and OpenAI (gpt-3.5-turbo)
 - **Bug Fixes:**
   - Fixed missing BorderRadius import in ChatScreen.tsx
   - Fixed Google Calendar ID persistence for chat-created events
   - Fixed expo-file-system deprecation warnings
-  - Updated Expo packages to recommended versions
 - **Known Limitations:**
   - Document upload (bank statement OCR) requires custom development build
   - Expo Go doesn't support expo-document-picker due to iOS iCloud entitlement requirements
-  - For production, build standalone app or use EAS Build
-- **Security Note**: AI API keys are called directly from client (keys in bundle). For production, move to backend server.
+- **Security**: API keys now secured in backend server, never bundled with mobile app
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
 ## System Architecture
+
+### Backend Server (Node.js/Express)
+
+**Location**: `/server` directory
+
+**Purpose**: Secure API proxy for AI services and file processing, keeping API keys server-side only
+
+**Architecture**:
+```
+server/
+├── src/
+│   ├── index.ts                    # Express app with CORS, rate limiting
+│   ├── routes/                     # API endpoints
+│   │   ├── chat.ts                # POST /api/chat
+│   │   └── files.ts               # POST /api/files/statement
+│   ├── controllers/                # Request handlers
+│   │   ├── chatController.ts
+│   │   └── filesController.ts
+│   ├── services/                   # Business logic
+│   │   ├── aiProviderService.ts   # Multi-provider AI (Gemini/OpenAI/Local)
+│   │   └── ocrService.ts          # Bank statement OCR processing
+│   ├── middleware/
+│   │   ├── errorHandler.ts        # Global error handling
+│   │   └── validation.ts          # Request validation (Zod)
+│   └── utils/
+│       └── logger.ts              # Structured logging
+├── .env                           # API keys (NEVER commit!)
+├── package.json
+└── README.md                      # Full setup instructions
+```
+
+**Setup**:
+1. `cd server && npm install`
+2. Copy `.env.example` to `.env` and add your API keys
+3. `npm run dev` to start on port 3001
+4. Or add "Start backend server" workflow in Replit UI (see `/server/README.md`)
+
+**API Endpoints**:
+- `POST /api/chat` - Process AI chat messages (returns {response, provider, timestamp})
+- `POST /api/files/statement` - Upload bank statements for OCR processing
+- `GET /health` - Health check
+
+**Security Features**:
+- API keys in `.env` (dotenv), never in client bundle
+- CORS restricted to Replit domains
+- Rate limiting: 100 requests per 15 minutes
+- File upload validation: Type (PDF/images), size (max 10MB)
+- Request validation with Zod schemas
 
 ### Frontend Architecture
 
