@@ -396,29 +396,62 @@ export default function ScheduleScreen() {
               <ThemedText type="caption" style={{ color: theme.textSecondary }}>
                 Date
               </ThemedText>
-              <Pressable
-                onPress={() => setShowDatePicker(true)}
-                style={[
-                  styles.dateTimeButton,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <Feather name="calendar" size={20} color={theme.accent} />
-                <ThemedText style={{ marginLeft: Spacing.sm }}>
-                  {selectedDate.toLocaleDateString("en-US", { 
-                    month: "long", 
-                    day: "numeric", 
-                    year: "numeric" 
-                  })}
-                </ThemedText>
-              </Pressable>
-              {(showDatePicker || Platform.OS === 'ios') && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onDateChange}
+              {Platform.OS === 'web' ? (
+                <input
+                  type="date"
+                  value={selectedDate.toISOString().split('T')[0]}
+                  onChange={(e) => {
+                    const newDate = new Date(e.target.value);
+                    const updatedDate = new Date(
+                      newDate.getFullYear(),
+                      newDate.getMonth(),
+                      newDate.getDate(),
+                      selectedDate.getHours(),
+                      selectedDate.getMinutes()
+                    );
+                    setSelectedDate(updatedDate);
+                  }}
+                  style={{
+                    height: Spacing.inputHeight,
+                    borderRadius: BorderRadius.input,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    backgroundColor: theme.surface,
+                    color: theme.textPrimary,
+                    paddingLeft: Spacing.md,
+                    paddingRight: Spacing.md,
+                    marginTop: Spacing.sm,
+                    fontSize: 16,
+                    fontFamily: 'inherit',
+                  }}
                 />
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    style={[
+                      styles.dateTimeButton,
+                      { backgroundColor: theme.surface, borderColor: theme.border },
+                    ]}
+                  >
+                    <Feather name="calendar" size={20} color={theme.accent} />
+                    <ThemedText style={{ marginLeft: Spacing.sm }}>
+                      {selectedDate.toLocaleDateString("en-US", { 
+                        month: "long", 
+                        day: "numeric", 
+                        year: "numeric" 
+                      })}
+                    </ThemedText>
+                  </Pressable>
+                  {(showDatePicker || Platform.OS === 'ios') && (
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onDateChange}
+                    />
+                  )}
+                </>
               )}
             </View>
 
@@ -426,28 +459,61 @@ export default function ScheduleScreen() {
               <ThemedText type="caption" style={{ color: theme.textSecondary }}>
                 Time
               </ThemedText>
-              <Pressable
-                onPress={() => setShowTimePicker(true)}
-                style={[
-                  styles.dateTimeButton,
-                  { backgroundColor: theme.surface, borderColor: theme.border },
-                ]}
-              >
-                <Feather name="clock" size={20} color={theme.accent} />
-                <ThemedText style={{ marginLeft: Spacing.sm }}>
-                  {selectedDate.toLocaleTimeString("en-US", { 
-                    hour: "numeric", 
-                    minute: "2-digit" 
-                  })}
-                </ThemedText>
-              </Pressable>
-              {(showTimePicker || Platform.OS === 'ios') && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={onTimeChange}
+              {Platform.OS === 'web' ? (
+                <input
+                  type="time"
+                  value={selectedDate.toTimeString().split(' ')[0].substring(0, 5)}
+                  onChange={(e) => {
+                    const [hours, minutes] = e.target.value.split(':').map(Number);
+                    const updatedDate = new Date(
+                      selectedDate.getFullYear(),
+                      selectedDate.getMonth(),
+                      selectedDate.getDate(),
+                      hours,
+                      minutes
+                    );
+                    setSelectedDate(updatedDate);
+                  }}
+                  style={{
+                    height: Spacing.inputHeight,
+                    borderRadius: BorderRadius.input,
+                    borderWidth: 1,
+                    borderColor: theme.border,
+                    backgroundColor: theme.surface,
+                    color: theme.textPrimary,
+                    paddingLeft: Spacing.md,
+                    paddingRight: Spacing.md,
+                    marginTop: Spacing.sm,
+                    fontSize: 16,
+                    fontFamily: 'inherit',
+                  }}
                 />
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => setShowTimePicker(true)}
+                    style={[
+                      styles.dateTimeButton,
+                      { backgroundColor: theme.surface, borderColor: theme.border },
+                    ]}
+                  >
+                    <Feather name="clock" size={20} color={theme.accent} />
+                    <ThemedText style={{ marginLeft: Spacing.sm }}>
+                      {selectedDate.toLocaleTimeString("en-US", { 
+                        hour: "numeric", 
+                        minute: "2-digit" 
+                      })}
+                    </ThemedText>
+                  </Pressable>
+                  {(showTimePicker || Platform.OS === 'ios') && (
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="time"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={onTimeChange}
+                    />
+                  )}
+                </>
               )}
             </View>
 
