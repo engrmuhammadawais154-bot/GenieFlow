@@ -1,101 +1,112 @@
-import { google } from "googleapis";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Event } from "@/types";
 
-let connectionSettings: any;
+const STORAGE_KEY = "@calendar_events";
 
-async function getAccessToken() {
-  if (
-    connectionSettings &&
-    connectionSettings.settings.expires_at &&
-    new Date(connectionSettings.settings.expires_at).getTime() > Date.now()
-  ) {
-    return connectionSettings.settings.access_token;
-  }
+// Mock calendar service for Expo/React Native
+// In a production app, this would connect to a backend API that interfaces with Google Calendar
 
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const xReplitToken = process.env.REPL_IDENTITY
-    ? "repl " + process.env.REPL_IDENTITY
-    : process.env.WEB_REPL_RENEWAL
-      ? "depl " + process.env.WEB_REPL_RENEWAL
-      : null;
-
-  if (!xReplitToken) {
-    throw new Error("X_REPLIT_TOKEN not found for repl/depl");
-  }
-
-  connectionSettings = await fetch(
-    "https://" +
-      hostname +
-      "/api/v2/connection?include_secrets=true&connector_names=google-calendar",
-    {
-      headers: {
-        Accept: "application/json",
-        X_REPLIT_TOKEN: xReplitToken,
-      },
+export async function getUpcomingEvents(): Promise<Event[]> {
+  try {
+    const stored = await AsyncStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const events = JSON.parse(stored);
+      return events.map((e: any) => ({
+        ...e,
+        start: new Date(e.start),
+        end: new Date(e.end),
+      }));
     }
-  )
-    .then((res) => res.json())
-    .then((data) => data.items?.[0]);
-
-  const accessToken =
-    connectionSettings?.settings?.access_token ||
-    connectionSettings.settings?.oauth?.credentials?.access_token;
-
-  if (!connectionSettings || !accessToken) {
-    throw new Error("Google Calendar not connected");
-  }
-  return accessToken;
-}
-
-async function getUncachableGoogleCalendarClient() {
-  const accessToken = await getAccessToken();
-
-  const oauth2Client = new google.auth.OAuth2();
-  oauth2Client.setCredentials({
-    access_token: accessToken,
-  });
-
-  return google.calendar({ version: "v3", auth: oauth2Client });
-}
-
-export async function createCalendarEvent(event: Event): Promise<string> {
-  try {
-    const calendar = await getUncachableGoogleCalendarClient();
-
-    const response = await calendar.events.insert({
-      calendarId: "primary",
-      requestBody: {
-        summary: event.title,
-        description: event.description,
-        start: {
-          dateTime: event.dateTime.toISOString(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-        end: {
-          dateTime: new Date(
-            event.dateTime.getTime() + 60 * 60 * 1000
-          ).toISOString(),
-          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-      },
-    });
-
-    return response.data.id || "";
+    
+    // Return mock events if no stored data
+    return getMockEvents();
   } catch (error) {
-    console.error("Calendar event creation error:", error);
+    console.error("Error loading events:", error);
+    return getMockEvents();
+  }
+}
+
+export async function createEvent(event: Omit<Event, "id">): Promise<Event> {
+  try {
+    const events = await getUpcomingEvents();
+    const newEvent: Event = {
+      ...event,
+      id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    };
+    
+    events.push(newEvent);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    
+    return newEvent;
+  } catch (error) {
+    console.error("Error creating event:", error);
     throw error;
   }
 }
 
-export async function deleteCalendarEvent(eventId: string): Promise<void> {
+export async function updateEvent(id: string, updates: Partial<Event>): Promise<Event> {
   try {
-    const calendar = await getUncachableGoogleCalendarClient();
-    await calendar.events.delete({
-      calendarId: "primary",
-      eventId,
-    });
+    const events = await getUpcomingEvents();
+    const index = events.findIndex(e => e.id === id);
+    
+    if (index === -1) {
+      throw new Error("Event not found");
+    }
+    
+    const updatedEvent = { ...events[index], ...updates };
+    events[index] = updatedEvent;
+    
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(events));
+    return updatedEvent;
   } catch (error) {
-    console.error("Calendar event deletion error:", error);
+    console.error("Error updating event:", error);
     throw error;
   }
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  try {
+    const events = await getUpcomingEvents();
+    const filtered = events.filter(e => e.id !== id);
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  } catch (error) {
+    console.error("Error deleting event:", error);
+    throw error;
+  }
+}
+
+function getMockEvents(): Event[] {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const nextWeek = new Date(now);
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  
+  return [
+    {
+      id: "1",
+      title: "Team Standup",
+      description: "Daily team sync meeting",
+      start: new Date(now.setHours(10, 0, 0, 0)),
+      end: new Date(now.setHours(10, 30, 0, 0)),
+      location: "Conference Room A",
+    },
+    {
+      id: "2",
+      title: "Project Review",
+      description: "Quarterly project review with stakeholders",
+      start: new Date(tomorrow.setHours(14, 0, 0, 0)),
+      end: new Date(tomorrow.setHours(15, 30, 0, 0)),
+      location: "Zoom",
+    },
+    {
+      id: "3",
+      title: "Client Presentation",
+      description: "Present new features to client",
+      start: new Date(nextWeek.setHours(11, 0, 0, 0)),
+      end: new Date(nextWeek.setHours(12, 0, 0, 0)),
+      location: "Client Office",
+    },
+  ];
 }

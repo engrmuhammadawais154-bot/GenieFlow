@@ -250,5 +250,3 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
 });
-
-import { ThemedText } from "@/components/ThemedText";
