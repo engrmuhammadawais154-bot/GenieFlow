@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, ScrollView, StyleSheet, Alert, Pressable, Modal, TextInput } from "react-native";
+import { View, ScrollView, StyleSheet, Alert, Pressable, Modal, TextInput, ActivityIndicator } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -9,6 +9,8 @@ import { FAB } from "@/components/FAB";
 import { useTheme } from "@/hooks/useTheme";
 import { storage } from "@/services/storage";
 import { convertCurrency, popularCurrencies } from "@/services/currencyService";
+import { processStatementDocument } from "@/services/ocrService";
+import { PDFService } from "@/services/pdfService";
 import { Transaction } from "@/types";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +32,7 @@ export default function FinancesScreen() {
   const [toCurrency, setToCurrency] = useState("EUR");
   const [convertedAmount, setConvertedAmount] = useState("");
   const [converting, setConverting] = useState(false);
+  const [processingStatement, setProcessingStatement] = useState(false);
 
   useEffect(() => {
     loadTransactions();
@@ -64,51 +67,45 @@ export default function FinancesScreen() {
         return;
       }
 
-      Alert.alert(
-        "Statement Processing",
-        "Document uploaded! In a production app, this would use OCR to extract transactions. For now, I'll add sample transactions.",
-        [
-          {
-            text: "OK",
-            onPress: async () => {
-              const sampleTransactions: Transaction[] = [
-                {
-                  id: Date.now().toString(),
-                  date: new Date(),
-                  description: "Salary Deposit",
-                  amount: 5000,
-                  type: "income",
-                  category: "Salary",
-                },
-                {
-                  id: (Date.now() + 1).toString(),
-                  date: new Date(),
-                  description: "Grocery Shopping",
-                  amount: 250,
-                  type: "expense",
-                  category: "Food",
-                },
-                {
-                  id: (Date.now() + 2).toString(),
-                  date: new Date(),
-                  description: "Electric Bill",
-                  amount: 120,
-                  type: "expense",
-                  category: "Utilities",
-                },
-              ];
+      setProcessingStatement(true);
 
-              const updatedTransactions = [...transactions, ...sampleTransactions];
-              setTransactions(updatedTransactions.sort((a, b) => b.date.getTime() - a.date.getTime()));
-              await storage.saveTransactions(updatedTransactions);
+      try {
+        const ocrResult = await processStatementDocument(
+          result.assets[0].uri,
+          result.assets[0].mimeType || "application/pdf"
+        );
 
-              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            },
-          },
-        ]
-      );
+        if (ocrResult.transactions.length === 0) {
+          Alert.alert(
+            "No Transactions Found",
+            "Could not extract transactions from this document. Please try a different file or format."
+          );
+          return;
+        }
+
+        const updatedTransactions = [...transactions, ...ocrResult.transactions];
+        setTransactions(updatedTransactions.sort((a, b) => b.date.getTime() - a.date.getTime()));
+        await storage.saveTransactions(updatedTransactions);
+
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        Alert.alert(
+          "Statement Processed",
+          `Successfully extracted ${ocrResult.transactions.length} transactions from ${ocrResult.bankName}.`
+        );
+      } catch (processingError) {
+        console.error("OCR processing error:", processingError);
+        Alert.alert(
+          "Processing Failed",
+          "Failed to process the document. Please ensure it's a valid bank statement."
+        );
+      } finally {
+        setProcessingStatement(false);
+      }
     } catch (error) {
+      console.error("Document picker error:", error);
       Alert.alert("Error", "Failed to upload document. Please try again.");
+      setProcessingStatement(false);
     }
   };
 
@@ -137,6 +134,39 @@ export default function FinancesScreen() {
     setCurrencyModalVisible(true);
   };
 
+  const handleExportPDF = async () => {
+    if (transactions.length === 0) {
+      Alert.alert("No Data", "You need some transactions before exporting a report.");
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const { totalIncome, totalExpenses, balance } = calculateBalance();
+      
+      const sortedTransactions = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime());
+      const oldestDate = sortedTransactions[sortedTransactions.length - 1].date;
+      const newestDate = sortedTransactions[0].date;
+
+      await PDFService.generateFinancialReport({
+        transactions: sortedTransactions,
+        period: {
+          start: oldestDate,
+          end: newestDate,
+        },
+        totalIncome,
+        totalExpenses,
+        balance,
+      });
+
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error("PDF export error:", error);
+      Alert.alert("Error", "Failed to export PDF. Please try again.");
+    }
+  };
+
   const { totalIncome, totalExpenses, balance } = calculateBalance();
 
   return (
@@ -155,12 +185,40 @@ export default function FinancesScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <ThemedText type="h2">Recent Transactions</ThemedText>
-            <Pressable onPress={handleUploadStatement}>
-              <Feather name="upload" size={24} color={theme.accent} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable onPress={handleExportPDF} style={{ marginRight: Spacing.md }}>
+                <Feather name="download" size={24} color={theme.accent} />
+              </Pressable>
+              <Pressable onPress={handleUploadStatement} disabled={processingStatement}>
+                {processingStatement ? (
+                  <ActivityIndicator size="small" color={theme.accent} />
+                ) : (
+                  <Feather name="upload" size={24} color={theme.accent} />
+                )}
+              </Pressable>
+            </View>
           </View>
 
-          {transactions.length === 0 ? (
+          {processingStatement ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color={theme.accent} />
+              <ThemedText
+                type="h2"
+                style={{ textAlign: "center", marginTop: Spacing.lg }}
+              >
+                Processing Statement
+              </ThemedText>
+              <ThemedText
+                style={{
+                  textAlign: "center",
+                  color: theme.textSecondary,
+                  marginTop: Spacing.sm,
+                }}
+              >
+                Extracting transactions with AI...
+              </ThemedText>
+            </View>
+          ) : transactions.length === 0 ? (
             <View style={styles.emptyState}>
               <Feather name="file-text" size={48} color={theme.textSecondary} />
               <ThemedText
@@ -295,6 +353,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   emptyState: {
     justifyContent: "center",

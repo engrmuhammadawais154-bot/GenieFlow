@@ -32,6 +32,9 @@ export interface Transaction {
   amount: number;
   type: "income" | "expense";
   category: string;
+  categoryConfidence?: number;
+  subcategory?: string;
+  bankName?: string;
 }
 
 export interface BalanceSheet {

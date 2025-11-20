@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, FlatList, StyleSheet, Alert, Pressable, Modal, TextInput, Switch } from "react-native";
+import { View, FlatList, StyleSheet, Alert, Pressable, Modal, TextInput, Switch, ScrollView } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
@@ -9,6 +9,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { storage } from "@/services/storage";
 import { createCalendarEvent, deleteCalendarEvent } from "@/services/calendarService";
 import { scheduleEventReminders, cancelEventReminders, requestNotificationPermissions } from "@/services/notificationService";
+import { SchedulingService, RecurringPattern, SchedulingSuggestion } from "@/services/schedulingService";
 import { Event } from "@/types";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,11 +34,23 @@ export default function ScheduleScreen() {
     sixHours: true,
     oneHour: true,
   });
+  const [recurringPatterns, setRecurringPatterns] = useState<RecurringPattern[]>([]);
+  const [suggestions, setSuggestions] = useState<SchedulingSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     loadEvents();
     requestNotificationPermissions();
   }, [isFocused]);
+
+  useEffect(() => {
+    if (events.length >= 3) {
+      const patterns = SchedulingService.detectRecurringPatterns(events);
+      setRecurringPatterns(patterns);
+      
+      SchedulingService.generateSmartSuggestions(events).then(setSuggestions);
+    }
+  }, [events]);
 
   const loadEvents = async () => {
     const savedEvents = await storage.getEvents();
@@ -121,6 +134,25 @@ export default function ScheduleScreen() {
     setModalVisible(true);
   };
 
+  const applySuggestion = (suggestion: SchedulingSuggestion) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setTitle(suggestion.title);
+    setSelectedDate(suggestion.suggestedTime);
+    setModalVisible(true);
+    setShowSuggestions(false);
+  };
+
+  const formatDate = (date: Date): string => {
+    const now = new Date();
+    const diffDays = Math.floor((date.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+    
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    if (diffDays < 7) return date.toLocaleDateString("en-US", { weekday: "long" });
+    
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
   return (
     <ThemedView style={styles.container}>
       <FlatList
@@ -136,6 +168,62 @@ export default function ScheduleScreen() {
             paddingBottom: tabBarHeight + 80,
           },
         ]}
+        ListHeaderComponent={
+          suggestions.length > 0 && showSuggestions ? (
+            <View style={styles.suggestionsSection}>
+              <View style={styles.suggestionHeader}>
+                <ThemedText type="h2">Smart Suggestions</ThemedText>
+                <Pressable onPress={() => setShowSuggestions(false)}>
+                  <Feather name="x" size={20} color={theme.textSecondary} />
+                </Pressable>
+              </View>
+              {suggestions.slice(0, 3).map((suggestion, index) => (
+                <Pressable
+                  key={index}
+                  style={[styles.suggestionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                  onPress={() => applySuggestion(suggestion)}
+                >
+                  <View style={styles.suggestionContent}>
+                    <Feather name="zap" size={18} color={theme.accent} />
+                    <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                      <ThemedText style={{ fontWeight: "600" }}>{suggestion.title}</ThemedText>
+                      <ThemedText style={{ fontSize: 14, color: theme.textSecondary, marginTop: 2 }}>
+                        {formatDate(suggestion.suggestedTime)} at {suggestion.suggestedTime.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </ThemedText>
+                      <ThemedText style={{ fontSize: 12, color: theme.textSecondary, marginTop: 4 }}>
+                        {suggestion.reason}
+                      </ThemedText>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          ) : recurringPatterns.length > 0 && !showSuggestions ? (
+            <View style={styles.suggestionsSection}>
+              <View style={styles.suggestionHeader}>
+                <ThemedText type="h2">Recurring Patterns Detected</ThemedText>
+                <Pressable onPress={() => setShowSuggestions(true)}>
+                  <ThemedText style={{ color: theme.accent }}>View Suggestions</ThemedText>
+                </Pressable>
+              </View>
+              {recurringPatterns.slice(0, 2).map((pattern, index) => (
+                <View
+                  key={index}
+                  style={[styles.patternCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                >
+                  <Feather name="repeat" size={18} color={theme.accent} />
+                  <View style={{ flex: 1, marginLeft: Spacing.sm }}>
+                    <ThemedText style={{ fontWeight: "600" }}>{pattern.suggestedTitle}</ThemedText>
+                    <ThemedText style={{ fontSize: 14, color: theme.textSecondary, marginTop: 2 }}>
+                      {pattern.type} • {Math.round(pattern.confidence * 100)}% match
+                    </ThemedText>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Feather name="calendar" size={48} color={theme.textSecondary} />
@@ -296,5 +384,32 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: Spacing.sm,
+  },
+  suggestionsSection: {
+    marginBottom: Spacing.lg,
+  },
+  suggestionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  suggestionCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  suggestionContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  patternCard: {
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
   },
 });

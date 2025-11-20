@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { View, FlatList, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import { View, FlatList, StyleSheet, ActivityIndicator, Alert, Pressable } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { ThemedView } from "@/components/ThemedView";
+import { ThemedText } from "@/components/ThemedText";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ChatInput } from "@/components/ChatInput";
 import { FAB } from "@/components/FAB";
 import { storage } from "@/services/storage";
 import { processUserInput } from "@/services/aiService";
+import { VoiceService } from "@/services/voiceService";
 import { Message } from "@/types";
 import { Spacing } from "@/constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +26,8 @@ export default function ChatScreen() {
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   useEffect(() => {
     loadMessages();
@@ -62,6 +67,17 @@ export default function ChatScreen() {
       await storage.saveMessages(finalMessages);
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (voiceEnabled) {
+        try {
+          setIsSpeaking(true);
+          await VoiceService.speak(intent.response);
+          setIsSpeaking(false);
+        } catch (voiceError) {
+          setIsSpeaking(false);
+          console.error("TTS error:", voiceError);
+        }
+      }
     } catch (error) {
       Alert.alert("Error", "Failed to process your message. Please try again.");
     } finally {
@@ -73,8 +89,29 @@ export default function ChatScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       "Voice Input",
-      "Voice input feature coming soon! For now, please type your message."
+      "Voice input feature coming soon! For now, please type your message.",
+      [
+        {
+          text: "OK",
+          style: "cancel",
+        },
+      ]
     );
+  };
+
+  const toggleVoiceResponse = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setVoiceEnabled(!voiceEnabled);
+    if (isSpeaking) {
+      VoiceService.stop();
+      setIsSpeaking(false);
+    }
+  };
+
+  const stopSpeaking = () => {
+    VoiceService.stop();
+    setIsSpeaking(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
   return (
@@ -120,12 +157,42 @@ export default function ChatScreen() {
           },
         ]}
       >
+        {isSpeaking ? (
+          <View style={[styles.voiceControls, { backgroundColor: theme.surface }]}>
+            <View style={styles.voiceControlsContent}>
+              <Feather name="volume-2" size={20} color={theme.accent} />
+              <ThemedText style={{ marginLeft: Spacing.sm, flex: 1 }}>
+                Speaking...
+              </ThemedText>
+              <Pressable onPress={stopSpeaking} style={styles.stopButton}>
+                <Feather name="square" size={18} color={theme.error} />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={theme.accent} />
           </View>
         ) : null}
-        <ChatInput onSend={handleSend} disabled={loading} />
+        <View style={styles.inputRow}>
+          <Pressable
+            onPress={toggleVoiceResponse}
+            style={[
+              styles.voiceToggle,
+              { backgroundColor: voiceEnabled ? theme.accent : theme.surface },
+            ]}
+          >
+            <Feather
+              name={voiceEnabled ? "volume-2" : "volume-x"}
+              size={20}
+              color={voiceEnabled ? "#FFFFFF" : theme.textSecondary}
+            />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <ChatInput onSend={handleSend} disabled={loading || isSpeaking} />
+          </View>
+        </View>
       </View>
       <FAB onPress={handleVoiceInput} />
     </ThemedView>
@@ -154,6 +221,33 @@ const styles = StyleSheet.create({
   loadingContainer: {
     padding: Spacing.md,
     alignItems: "center",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
+  },
+  voiceToggle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  voiceControls: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginHorizontal: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+  voiceControlsContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  stopButton: {
+    padding: Spacing.sm,
   },
 });
 
