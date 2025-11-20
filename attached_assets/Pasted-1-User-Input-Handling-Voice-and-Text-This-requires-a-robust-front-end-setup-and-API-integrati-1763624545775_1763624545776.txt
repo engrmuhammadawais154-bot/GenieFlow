@@ -1,0 +1,65 @@
+1. User Input Handling (Voice and Text) 🗣️
+This requires a robust front-end setup and API integration.
+
+Voice-to-Text (Transcription): You'll need an Automatic Speech Recognition (ASR) service to convert the user's spoken words into text.
+
+Technologies: Google Cloud Speech-to-Text, Azure Cognitive Services Speech, or specialized open-source models.
+
+Text Processing (Natural Language Understanding - NLU): This step processes both the transcribed voice input and direct text input to understand the user's intent (e.g., "Schedule Meeting," "Check Balance," "Convert Currency") and extract necessary entities (e.g., "date: tomorrow," "amount: 100 USD").
+
+Technologies: Large Language Models (LLMs) like Gemini, or specialized NLU frameworks like Rasa.
+
+2. Scheduling and Reminders 📅
+This core function requires integration with a calendar service and a reliable, scheduled job system.
+
+Calendar Integration:
+
+You'll need API access to a calendar service like Google Calendar, Microsoft Outlook Calendar (via Microsoft Graph API), or Apple Calendar.
+
+The agent must be able to authenticate on the user's behalf (using OAuth 2.0) to create and modify events.
+
+Persistent Reminder System:
+
+Since the reminders need to trigger 2 days, 1 day, 6 hours, and 1 hour early, you'll need a reliable backend job scheduler.
+
+When the agent creates the meeting, it should also create four separate scheduled tasks in the backend database/job queue for the specific reminder times.
+
+Technologies: Cron jobs, cloud-native services like AWS EventBridge/Lambda, Google Cloud Scheduler/Cloud Functions, or specialized job queues like Redis Queue or Celery.
+
+3. Financial Data Management (Balance Sheet) 💰
+This is the most complex feature, requiring secure file processing, data extraction, and structured storage.
+
+Bank Statement Processing (Data Extraction):
+
+Users will upload documents (often PDFs). You need a system to parse these unstructured or semi-structured documents.
+
+This involves Optical Character Recognition (OCR) to read the text.
+
+A specialized model or an LLM with tool-use/function-calling capability is then needed to identify and extract key transaction details: Date, Description, Amount, and Type (Debit/Credit).
+
+Technologies: OCR APIs (like Tesseract, Cloud Vision API), and fine-tuned LLMs for structured data extraction.
+
+Data Storage and Structuring:
+
+The extracted data must be securely stored in a structured database to generate a balance sheet.
+
+Balance Sheet Fields: Assets, Liabilities, Equity, Revenue, and Expenses. The agent must categorize each bank transaction into the appropriate accounting category.
+
+Technologies: SQL or NoSQL databases (e.g., PostgreSQL, MongoDB).
+
+Expense Optimization/Statement Generation:
+
+To analyze monthly expenses, the agent will query the structured data, group transactions by month and category, and calculate totals. This is pure database query and reporting logic.
+
+4. Financial Math and Live Conversions 🧮
+This capability is primarily about tool-calling and external API integration.
+
+Currency Conversion:
+
+The agent must be integrated with a reliable, real-time Currency Exchange Rate API (e.g., ExchangeRate-API, Open Exchange Rates).
+
+When the user asks for a conversion (e.g., "How much is 50 USD in EUR?"), the NLU extracts the intent and parameters, and the LLM/Tool-Router then calls the external API with the correct inputs to get the live rate and perform the final calculation.
+
+General Financial Math:
+
+Standard calculations like calculating simple/compound interest, loan amortization, or percentage changes can be handled either by the LLM directly (as they are usually strong at math) or by a dedicated math library for guaranteed precision (especially for calculations involving floating-point numbers).
