@@ -7,7 +7,7 @@ import { EventCard } from "@/components/EventCard";
 import { FAB } from "@/components/FAB";
 import { useTheme } from "@/hooks/useTheme";
 import { storage } from "@/services/storage";
-import { createCalendarEvent, deleteCalendarEvent } from "@/services/calendarService";
+import { createEvent as createCalendarEvent, deleteEvent as deleteCalendarEvent } from "@/services/calendarService";
 import { scheduleEventReminders, cancelEventReminders, requestNotificationPermissions } from "@/services/notificationService";
 import { SchedulingService, RecurringPattern, SchedulingSuggestion } from "@/services/schedulingService";
 import { Event } from "@/types";
