@@ -20,7 +20,7 @@ export function ThemedView({
       ? darkColor
       : !isDark && lightColor
         ? lightColor
-        : theme.backgroundRoot;
+        : theme.background;
 
   return <View style={[{ backgroundColor }, style]} {...otherProps} />;
 }

@@ -67,6 +67,7 @@ waitForPort = 8081
 
 [agent]
 stack = "EXPO"
+integrations = ["google-calendar:1.0.0"]
 
 [deployment]
 deploymentTarget = "static"

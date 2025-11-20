@@ -4,8 +4,8 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 
 interface ScreenOptionsParams {
   theme: {
-    backgroundRoot: string;
-    text: string;
+    background: string;
+    textPrimary: string;
   };
   isDark: boolean;
   transparent?: boolean;
@@ -19,17 +19,17 @@ export const getCommonScreenOptions = ({
   headerTitleAlign: "center",
   headerTransparent: transparent,
   headerBlurEffect: isDark ? "dark" : "light",
-  headerTintColor: theme.text,
+  headerTintColor: theme.textPrimary,
   headerStyle: {
     backgroundColor: Platform.select({
       ios: undefined,
-      android: theme.backgroundRoot,
+      android: theme.background,
     }),
   },
   gestureEnabled: true,
   gestureDirection: "horizontal",
   fullScreenGestureEnabled: isLiquidGlassAvailable() ? false : true,
   contentStyle: {
-    backgroundColor: theme.backgroundRoot,
+    backgroundColor: theme.background,
   },
 });
