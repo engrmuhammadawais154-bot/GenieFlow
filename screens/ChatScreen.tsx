@@ -10,6 +10,9 @@ import { FAB } from "@/components/FAB";
 import { storage } from "@/services/storage";
 import { processUserInput } from "@/services/aiService";
 import { VoiceService } from "@/services/voiceService";
+import { hasSchedulingIntent, parseEventFromText, createEventFromParsedData } from "@/services/eventParserService";
+import { createEvent as createCalendarEvent } from "@/services/calendarService";
+import { scheduleEventReminders } from "@/services/notificationService";
 import { Message } from "@/types";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,6 +57,65 @@ export default function ChatScreen() {
     setLoading(true);
 
     try {
+      // Check if this is a scheduling request
+      if (hasSchedulingIntent(text)) {
+        const parsedEvent = parseEventFromText(text);
+        
+        if (parsedEvent && parsedEvent.dateTime) {
+          const event = createEventFromParsedData(parsedEvent);
+          
+          // Create in Google Calendar first
+          const googleEventId = await createCalendarEvent(event);
+          event.googleCalendarEventId = googleEventId;
+          
+          // Schedule reminders
+          await scheduleEventReminders(event);
+          
+          // Save to storage with Google Calendar ID
+          const existingEvents = await storage.getEvents();
+          const newEvents = [...existingEvents, event];
+          await storage.saveEvents(newEvents);
+          
+          // Respond with confirmation
+          const confirmationText = `Great! I've scheduled "${parsedEvent.title}" for ${parsedEvent.dateTime.toLocaleString("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}. You'll receive reminders before the event.`;
+          
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: confirmationText,
+            isUser: false,
+            timestamp: new Date(),
+          };
+          
+          const finalMessages = [...updatedMessages, aiMessage];
+          setMessages(finalMessages);
+          await storage.saveMessages(finalMessages);
+          
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          
+          if (voiceEnabled) {
+            try {
+              setIsSpeaking(true);
+              await VoiceService.speak(confirmationText);
+              setIsSpeaking(false);
+            } catch (voiceError) {
+              setIsSpeaking(false);
+              console.error("TTS error:", voiceError);
+            }
+          }
+          
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Regular AI chat processing
       const intent = await processUserInput(text);
 
       const aiMessage: Message = {
@@ -90,10 +152,10 @@ export default function ChatScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       "Voice Input",
-      "Voice input feature coming soon! For now, please type your message.",
+      "Try typing scheduling commands like:\n\n• \"Schedule meeting with John tomorrow at 2pm\"\n• \"Remind me to call mom on Friday at 10am\"\n• \"Team standup next Monday 9:30am\"\n\nVoice recognition coming soon!",
       [
         {
-          text: "OK",
+          text: "Got it",
           style: "cancel",
         },
       ]
@@ -135,7 +197,7 @@ export default function ChatScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <ThemedText type="h2" style={{ textAlign: "center" }}>
-              Hi! I'm your AI Assistant
+              Hi! I'm your Financial Assistant
             </ThemedText>
             <ThemedText
               style={{
@@ -144,7 +206,19 @@ export default function ChatScreen() {
                 marginTop: Spacing.sm,
               }}
             >
-              I can help you schedule meetings, convert currency, and manage your finances.
+              I can help you manage finances, schedule finance-related meetings, and convert currency. Try asking me to:
+            </ThemedText>
+            <ThemedText
+              style={{
+                textAlign: "center",
+                color: theme.textSecondary,
+                marginTop: Spacing.md,
+                fontSize: 14,
+              }}
+            >
+              • "Schedule budget review meeting tomorrow at 3pm"
+              {"\n"}• "How can I save money on groceries?"
+              {"\n"}• "Convert 100 USD to EUR"
             </ThemedText>
           </View>
         }

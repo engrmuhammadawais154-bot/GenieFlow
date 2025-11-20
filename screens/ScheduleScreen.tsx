@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
-import { View, FlatList, StyleSheet, Alert, Pressable, Modal, TextInput, Switch, ScrollView } from "react-native";
+import { View, FlatList, StyleSheet, Alert, Pressable, Modal, TextInput, Switch, Platform } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { EventCard } from "@/components/EventCard";
 import { FAB } from "@/components/FAB";
 import { useTheme } from "@/hooks/useTheme";
 import { storage } from "@/services/storage";
-import { createEvent as createCalendarEvent, deleteEvent as deleteCalendarEvent } from "@/services/calendarService";
+import { createEvent as createCalendarEvent, updateEvent as updateCalendarEvent, deleteEvent as deleteCalendarEvent } from "@/services/calendarService";
 import { scheduleEventReminders, cancelEventReminders, requestNotificationPermissions } from "@/services/notificationService";
 import { SchedulingService, RecurringPattern, SchedulingSuggestion } from "@/services/schedulingService";
 import { Event } from "@/types";
@@ -25,9 +26,12 @@ export default function ScheduleScreen() {
 
   const [events, setEvents] = useState<Event[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedDate, setSelectedDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [reminders, setReminders] = useState({
     twoDays: true,
     oneDay: true,
@@ -57,7 +61,7 @@ export default function ScheduleScreen() {
     setEvents(savedEvents.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()));
   };
 
-  const handleAddEvent = async () => {
+  const handleSaveEvent = async () => {
     if (!title.trim()) {
       Alert.alert("Error", "Please enter an event title");
       return;
@@ -65,40 +69,54 @@ export default function ScheduleScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const newEvent: Event = {
-      id: Date.now().toString(),
+    const eventData: Event = {
+      id: editingEvent?.id || Date.now().toString(),
       title: title.trim(),
       description: description.trim(),
       dateTime: selectedDate,
       reminders,
-      remindersSent: {
+      remindersSent: editingEvent?.remindersSent || {
         twoDays: false,
         oneDay: false,
         sixHours: false,
         oneHour: false,
       },
+      googleCalendarEventId: editingEvent?.googleCalendarEventId,
     };
 
     try {
-      const googleEventId = await createCalendarEvent(newEvent);
-      newEvent.googleCalendarEventId = googleEventId;
+      if (editingEvent) {
+        // Update existing event
+        if (eventData.googleCalendarEventId) {
+          await updateCalendarEvent(eventData.googleCalendarEventId, eventData);
+        }
+        
+        await cancelEventReminders(eventData.id);
+        await scheduleEventReminders(eventData);
 
-      await scheduleEventReminders(newEvent);
+        const updatedEvents = events.map(e => e.id === eventData.id ? eventData : e);
+        setEvents(updatedEvents.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()));
+        await storage.saveEvents(updatedEvents);
 
-      const updatedEvents = [...events, newEvent];
-      setEvents(updatedEvents.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()));
-      await storage.saveEvents(updatedEvents);
+        Alert.alert("Success", "Event updated successfully!");
+      } else {
+        // Create new event
+        const googleEventId = await createCalendarEvent(eventData);
+        eventData.googleCalendarEventId = googleEventId;
 
-      setModalVisible(false);
-      setTitle("");
-      setDescription("");
-      setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
-      setReminders({ twoDays: true, oneDay: true, sixHours: true, oneHour: true });
+        await scheduleEventReminders(eventData);
 
+        const updatedEvents = [...events, eventData];
+        setEvents(updatedEvents.sort((a, b) => a.dateTime.getTime() - b.dateTime.getTime()));
+        await storage.saveEvents(updatedEvents);
+
+        Alert.alert("Success", "Event created and synced to Google Calendar!");
+      }
+
+      closeModal();
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Success", "Event created and synced to Google Calendar!");
     } catch (error) {
-      Alert.alert("Error", "Failed to create event. Please try again.");
+      Alert.alert("Error", `Failed to ${editingEvent ? 'update' : 'create'} event. Please try again.`);
     }
   };
 
@@ -129,9 +147,33 @@ export default function ScheduleScreen() {
     ]);
   };
 
+  const handleEditEvent = (event: Event) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setEditingEvent(event);
+    setTitle(event.title);
+    setDescription(event.description || "");
+    setSelectedDate(event.dateTime);
+    setReminders(event.reminders);
+    setModalVisible(true);
+  };
+
   const handleAddEventPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setEditingEvent(null);
+    setTitle("");
+    setDescription("");
+    setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    setReminders({ twoDays: true, oneDay: true, sixHours: true, oneHour: true });
     setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setEditingEvent(null);
+    setTitle("");
+    setDescription("");
+    setSelectedDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+    setReminders({ twoDays: true, oneDay: true, sixHours: true, oneHour: true });
   };
 
   const applySuggestion = (suggestion: SchedulingSuggestion) => {
@@ -140,6 +182,38 @@ export default function ScheduleScreen() {
     setSelectedDate(suggestion.suggestedTime);
     setModalVisible(true);
     setShowSuggestions(false);
+  };
+
+  const onDateChange = (event: any, selected: Date | undefined) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+    }
+    if (selected) {
+      const newDate = new Date(
+        selected.getFullYear(),
+        selected.getMonth(),
+        selected.getDate(),
+        selectedDate.getHours(),
+        selectedDate.getMinutes()
+      );
+      setSelectedDate(newDate);
+    }
+  };
+
+  const onTimeChange = (event: any, selected: Date | undefined) => {
+    if (Platform.OS === 'android') {
+      setShowTimePicker(false);
+    }
+    if (selected) {
+      const newDate = new Date(
+        selectedDate.getFullYear(),
+        selectedDate.getMonth(),
+        selectedDate.getDate(),
+        selected.getHours(),
+        selected.getMinutes()
+      );
+      setSelectedDate(newDate);
+    }
   };
 
   const formatDate = (date: Date): string => {
@@ -159,7 +233,11 @@ export default function ScheduleScreen() {
         data={events}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <EventCard event={item} onDelete={() => handleDeleteEvent(item)} />
+          <EventCard 
+            event={item} 
+            onPress={() => handleEditEvent(item)}
+            onDelete={() => handleDeleteEvent(item)} 
+          />
         )}
         contentContainerStyle={[
           styles.list,
@@ -248,11 +326,11 @@ export default function ScheduleScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <ThemedView style={styles.modal}>
           <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-            <Pressable onPress={() => setModalVisible(false)}>
+            <Pressable onPress={closeModal}>
               <ThemedText style={{ color: theme.error }}>Cancel</ThemedText>
             </Pressable>
-            <ThemedText type="h2">New Event</ThemedText>
-            <Pressable onPress={handleAddEvent}>
+            <ThemedText type="h2">{editingEvent ? "Edit Event" : "New Event"}</ThemedText>
+            <Pressable onPress={handleSaveEvent}>
               <ThemedText style={{ color: theme.accent, fontWeight: "600" }}>Save</ThemedText>
             </Pressable>
           </View>
@@ -303,9 +381,61 @@ export default function ScheduleScreen() {
 
             <View style={styles.formGroup}>
               <ThemedText type="caption" style={{ color: theme.textSecondary }}>
-                Date & Time (Tomorrow as default)
+                Date
               </ThemedText>
-              <ThemedText>{selectedDate.toLocaleString()}</ThemedText>
+              <Pressable
+                onPress={() => setShowDatePicker(true)}
+                style={[
+                  styles.dateTimeButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <Feather name="calendar" size={20} color={theme.accent} />
+                <ThemedText style={{ marginLeft: Spacing.sm }}>
+                  {selectedDate.toLocaleDateString("en-US", { 
+                    month: "long", 
+                    day: "numeric", 
+                    year: "numeric" 
+                  })}
+                </ThemedText>
+              </Pressable>
+              {(showDatePicker || Platform.OS === 'ios') && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onDateChange}
+                />
+              )}
+            </View>
+
+            <View style={styles.formGroup}>
+              <ThemedText type="caption" style={{ color: theme.textSecondary }}>
+                Time
+              </ThemedText>
+              <Pressable
+                onPress={() => setShowTimePicker(true)}
+                style={[
+                  styles.dateTimeButton,
+                  { backgroundColor: theme.surface, borderColor: theme.border },
+                ]}
+              >
+                <Feather name="clock" size={20} color={theme.accent} />
+                <ThemedText style={{ marginLeft: Spacing.sm }}>
+                  {selectedDate.toLocaleTimeString("en-US", { 
+                    hour: "numeric", 
+                    minute: "2-digit" 
+                  })}
+                </ThemedText>
+              </Pressable>
+              {(showTimePicker || Platform.OS === 'ios') && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onTimeChange}
+                />
+              )}
             </View>
 
             <View style={styles.formGroup}>
@@ -378,6 +508,15 @@ const styles = StyleSheet.create({
     height: 80,
     paddingTop: Spacing.md,
     textAlignVertical: "top",
+  },
+  dateTimeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: Spacing.inputHeight,
+    borderRadius: BorderRadius.input,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
   },
   reminderRow: {
     flexDirection: "row",
