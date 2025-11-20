@@ -55,61 +55,70 @@ export function EventCard({ event, onPress, onDelete }: EventCardProps) {
   };
 
   return (
-    <Pressable
-      style={({ pressed }) => [
+    <View
+      style={[
         styles.card,
         {
           backgroundColor: theme.surface,
           borderColor: theme.border,
-          opacity: pressed ? 0.6 : 1,
         },
       ]}
-      onPress={onPress}
     >
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.dateTimeContainer}>
-            <ThemedText type="h2" style={styles.title}>
-              {event.title}
-            </ThemedText>
-            <ThemedText style={{ color: theme.textSecondary }}>
-              {formatDate(event.dateTime)} at {formatTime(event.dateTime)}
-            </ThemedText>
+      <Pressable
+        style={({ pressed }) => [
+          styles.pressableContent,
+          { opacity: pressed ? 0.6 : 1 },
+        ]}
+        onPress={onPress}
+      >
+        <View style={styles.content}>
+          <View style={styles.header}>
+            <View style={styles.dateTimeContainer}>
+              <ThemedText type="h2" style={styles.title}>
+                {event.title}
+              </ThemedText>
+              <ThemedText style={{ color: theme.textSecondary }}>
+                {formatDate(event.dateTime)} at {formatTime(event.dateTime)}
+              </ThemedText>
+            </View>
           </View>
-          {onDelete ? (
-            <Pressable
-              onPress={onDelete}
-              style={({ pressed }) => [
-                styles.deleteButton,
-                { opacity: pressed ? 0.6 : 1 },
-              ]}
+          {event.description ? (
+            <ThemedText
+              style={[styles.description, { color: theme.textSecondary }]}
+              numberOfLines={2}
             >
-              <Feather name="trash-2" size={20} color={theme.error} />
-            </Pressable>
+              {event.description}
+            </ThemedText>
+          ) : null}
+          {getReminderBadges().length > 0 ? (
+            <View style={styles.badges}>
+              {getReminderBadges().map((badge, index) => (
+                <View
+                  key={index}
+                  style={[styles.badge, { backgroundColor: badge.color }]}
+                >
+                  <ThemedText style={styles.badgeText}>{badge.label}</ThemedText>
+                </View>
+              ))}
+            </View>
           ) : null}
         </View>
-        {event.description ? (
-          <ThemedText
-            style={[styles.description, { color: theme.textSecondary }]}
-            numberOfLines={2}
-          >
-            {event.description}
-          </ThemedText>
-        ) : null}
-        {getReminderBadges().length > 0 ? (
-          <View style={styles.badges}>
-            {getReminderBadges().map((badge, index) => (
-              <View
-                key={index}
-                style={[styles.badge, { backgroundColor: badge.color }]}
-              >
-                <ThemedText style={styles.badgeText}>{badge.label}</ThemedText>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+      {onDelete ? (
+        <Pressable
+          onPress={(e) => {
+            onDelete();
+          }}
+          style={({ pressed }) => [
+            styles.deleteButton,
+            { opacity: pressed ? 0.6 : 1 },
+          ]}
+          hitSlop={8}
+        >
+          <Feather name="trash-2" size={20} color={theme.error} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
@@ -119,6 +128,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
+    position: "relative",
+  },
+  pressableContent: {
+    width: "100%",
   },
   content: {
     padding: Spacing.cardPadding,
@@ -130,6 +143,7 @@ const styles = StyleSheet.create({
   },
   dateTimeContainer: {
     flex: 1,
+    paddingRight: Spacing.xl,
   },
   title: {
     marginBottom: Spacing.xs,
@@ -138,7 +152,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   deleteButton: {
+    position: "absolute",
+    top: Spacing.cardPadding,
+    right: Spacing.cardPadding,
     padding: Spacing.xs,
+    zIndex: 10,
   },
   badges: {
     flexDirection: "row",
